@@ -3,56 +3,56 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Diagnostics;
 
-
-namespace UnityStandardAssets.Characters.ThirdPerson {
-    [RequireComponent(typeof(UnityEngine.AI.NavMeshAgent))]
-    [RequireComponent(typeof(HerdController))]
-    [RequireComponent(typeof(ThirdPersonCharacter))]
+//USER STORY -> Requirements (how + methodlogy) -> FEATURE  (traceability matrix shows how features meet requirements)
+//suggestion: combine Tech Screen with High Level Design
 
 
-    public class HerdController : MonoBehaviour {
+/* 
+ * Zebra's have internal hunger meter
+ *     Hunger decrements on timer or i
+ *      Seek out any grass TAG when hunger is empty
+ *          Replete hunger
+ *          
+ *      When lion in vision cone, run away
+ *          When lion gone a certain distance, stop running
+ * 
+ *      Random movement system
+ *     
+ * 
+ *      Herd following movement system
+ *      Leader randomly assigned and fluctuates
+ * 
+ */
 
 
-        //walking and run speed
-        public float walkSpeed;
-        public float runSpeed;
 
-        //rigidbody component
-        Rigidbody rb;
+public enum herdState
+{
+    IDLE,
+    FOLLOWING,
+    HERDING,
+    FLEEING,
+    EATING,
+    DEAD
+}
+
+
+    public class HerdController : MonoBehaviour
+    {
+       // public ThirdPersonCharacter Herd { get; private set; } // the character we are controlling
+        herdState nherdState;
+        int test = 0;
+        int hunger = 60;
+        private Transform target;                                    // target to aim for
+        public Player player;
+    public float movementSpeed;
+
+
+    //rigidbody component
+    Rigidbody rb;
 
         //collider component
         Collider col;
-
-        //stopwatch for eat timer
-        public Stopwatch timer;
-
-        int hunger = 100;
-
-
-        public UnityEngine.AI.NavMeshAgent agent { get; private set; }             // the navmesh agent required for the path finding
-        public ThirdPersonCharacter herd { get; private set; } // the character we are controlling
-        public Transform target;                                    // target to aim for
-
-
-        int test = 0;
-
-        // Use this for initialization
-
-        void Start()
-        {
-            //gets rigidbody
-            rb = GetComponent<Rigidbody>();
-            //gets collider
-            col = GetComponent<Collider>();
-
-
-            // get the components on the object we need ( should not be null due to require component so no need to check )
-            agent = GetComponentInChildren<UnityEngine.AI.NavMeshAgent>();
-            herd = GetComponent<ThirdPersonCharacter>();
-
-            agent.updateRotation = false;
-            agent.updatePosition = true;
-        }
 
 
         public void SetTarget(Transform target)
@@ -60,79 +60,92 @@ namespace UnityStandardAssets.Characters.ThirdPerson {
             this.target = target;
         }
 
-        // Update is called once per frame
-        void FixedUpdate() {
-            CheckView();
-            FindGrass();
 
+
+
+        void Start()
+        {
+            //gets rigidbody
+            rb = GetComponent<Rigidbody>();
+        //gets collider
+        col = GetComponent<Collider>();
         }
 
-        void CheckView()
+
+        void FixedUpdate()
         {
-            Vector3 targetDir = target.position - transform.position;
-            Vector3 forward = transform.forward;
-            float angle = Vector3.Angle(targetDir, forward);
-            if (angle < 5.0F)
+            hunger--;
+             Vector3 forward = transform.forward;
+
+               Vector3 playerDir = player.transform.position - transform.position;
+            float player_angle = Vector3.Angle(playerDir, forward);
+           switch (nherdState)
             {
-                test++;
-                print("close" + test);
-                //RunScared(); //test running away function
+                case herdState.IDLE:
+                    //Look for player
+              
+                    if (player_angle < 50.0F)
+                    {
+                        //if player is found
+                        SetTarget(target);
+                        nherdState = herdState.FLEEING;
+                        print("Saw player - " + test);
+                    }
+
+                    //Check hunger
+                    //if hunger low, look for grass
+                    if (hunger <= 0)
+                    {
+                        //print("Hungry");
+                        var objects = GameObject.FindGameObjectsWithTag("Grass");
+                        var objectCount = objects.Length;
+                        var obj = objects[0];
+                        Vector3 grassDir = obj.transform.position - transform.position;
+                        float grass_angle = Vector3.Angle(grassDir, forward);
+                        if (grass_angle < 300.0F)
+                        {
+                                transform.position = Vector3.MoveTowards(transform.position, obj.transform.position, movementSpeed);
+                                
+                        }
+                    else
+                        {
+                            print("Cannot find grass");
+                        }
+                        //{nherdState = herdState.EATING}
+                    }
+                    break;
+
+                case herdState.FLEEING:
+                    transform.position = Vector3.MoveTowards(transform.position, player.transform.position, movementSpeed); //move away not towards
+                    if (player_angle>50.0F)
+                     {
+                    SetTarget(null);
+                    nherdState = herdState.IDLE;
+                    print("Zebra flee");
+                     }
+                break;
+                    //etc.
 
             }
-            herd.Move(Vector3.forward, false, false);
-
         }
-
-        void RunScared()
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Grass"))
         {
-            if (target != null)
-                agent.SetDestination(target.position);
-
-            if (agent.remainingDistance > agent.stoppingDistance)
-                herd.Move(agent.desiredVelocity, false, false);
-            else
-                herd.Move(Vector3.zero, false, false);
-  
-        }
-
-        void FindGrass()
-        {
-            if (hunger == 100)
-            {
-                //find grass
-            }
-            else
-            {
-                //dont
-            }
-        }
-
-        private void OnTriggerEnter(Collider other)
-        {
-            if (other.CompareTag("Grass"))
-            {
-                EatGrass(other);
-                //play grass eat sound
-                //set timer for grass eat
-                //turn off AWARENESS function
-            }
-        }
-        //sets timer to eat and remove grass object
-        private void EatGrass(Collider o)
-        {
-
-            Destroy(o.gameObject);
-            /*
-            timer = new Stopwatch();
-            timer.Start();
-            while (timer.Elapsed.Seconds<10)
-            {
-                print(timer.Elapsed.Seconds);
-                if (timer.Elapsed.Seconds == 5)
-                {
-                    timer.Stop();
-                }
-            }*/
+            EatGrass(other);
+            //play grass eat sound
+            //set timer for grass eat
+            //turn off AWARENESS function
+            //sets timer to eat and remove grass object
         }
     }
-}
+    private void EatGrass(Collider o)
+    {
+
+        Destroy(o.gameObject);
+        hunger = 100;
+    }
+
+
+
+  }
