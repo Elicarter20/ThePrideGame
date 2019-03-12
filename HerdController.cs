@@ -9,22 +9,23 @@ using System.Diagnostics;
 
 /* 
  * Zebra's have internal hunger meter
- *     Hunger decrements on timer or i
- *      Seek out any grass TAG when hunger is empty
+ *     Hunger decrements on timer or i                   
+ *      Seek out any grass TAG when hunger is empty              - works
  *          Replete hunger
  *          
- *      When lion in vision cone, run away
- *          When lion gone a certain distance, stop running
+ *      When lion in vision cone, run away                        - instead of vision cone, is smell distance...
+ *          When lion gone a certain distance, stop running     - works, but with rigid body need to fix
  * 
- *      Random movement system
+ *      Random movement system                          - have YouTube video
  *     
  * 
- *      Herd following movement system
- *      Leader randomly assigned and fluctuates
+ *      Herd following movement system              - implement LEADER state into switch statement that others will follow their WANDEr function
+ *      Leader randomly assigned and fluctuates    - easy randomizer
  * 
  */
 
-
+    //current issues: stacking RIGID BODY BAD, instead need to trigger an actual 3rd person navmesh movement function, transforms are busted...
+    // random limits withion the plane
 
 public enum herdState
 {
@@ -41,12 +42,12 @@ public class HerdController : MonoBehaviour
 {
     // public ThirdPersonCharacter Herd { get; private set; } // the character we are controlling
     herdState nherdState;
-    int test = 0;
     int hunger = 60;
+    int eating = 1000;
     private Transform target;                                    // target to aim for
     public Player player;
     public float movementSpeed;
-
+    float fleeSpeed = 0.5F;
 
     //rigidbody component
     Rigidbody rb;
@@ -67,56 +68,75 @@ public class HerdController : MonoBehaviour
         col = GetComponent<Collider>();
     }
 
-    void FixedUpdate()
+    void Update()
     {
         hunger--;
         Vector3 forward = transform.forward;
         Vector3 playerDir = player.transform.position - transform.position;
         float player_angle = Vector3.Angle(playerDir, forward);
+        var distance = Vector3.Distance(player.transform.position, transform.position);
+        print(distance);
         switch (nherdState)
         {
             case herdState.IDLE:
-            //Look for player  
-            if (player_angle < 50.0F)
-            {
-                //if player is found
-                SetTarget(target);
-                nherdState = herdState.FLEEING;
-                print("Saw player - " + test);
-            }
+                //Look for player  
+                eating = 1000; //restore eating timer
+                if (distance < 20)//if (player_angle <= 50.0F)
+                {
+                    //if player is found
+                    SetTarget(target);
+                    nherdState = herdState.FLEEING;
+                   
+                    print("! --------------- ZEBRA FLEE");
+                }
 
-            //Check hunger
-            //if hunger low, look for grass
-            if (hunger <= 0)
-            {
-                //print("Hungry");
-                var objects = GameObject.FindGameObjectsWithTag("Grass");
-                var objectCount = objects.Length;
-                var obj = objects[0];
-                Vector3 grassDir = obj.transform.position - transform.position;
-                float grass_angle = Vector3.Angle(grassDir, forward);
-                if (grass_angle < 300.0F)
+                //Check hunger
+                //if hunger low, look for grass
+                else if (hunger <= 0)
                 {
-                        transform.position = Vector3.MoveTowards(transform.position, obj.transform.position, movementSpeed);
+                    //print("Hungry");
+                    var objects = GameObject.FindGameObjectsWithTag("Grass");
+                    var objectCount = objects.Length;
+                    var obj = objects[0];
+                    Vector3 grassDir = obj.transform.position - transform.position;
+                    float grass_angle = Vector3.Angle(grassDir, forward);
+                    if (grass_angle < 300.0F)
+                    {
+                            transform.position = Vector3.MoveTowards(transform.position, obj.transform.position, movementSpeed);
+                          //  nherdState = herdState.EATING;
+                            print("! --------------- ZEBRA EAT");
+
+                    }
+                    else
+                    {
+                        print("Cannot find grass");
+                    }
                 }
-                else
-                {
-                    print("Cannot find grass");
-                }
-                //{nherdState = herdState.EATING}
-            }
-            break;
+             break;
 
             case herdState.FLEEING:
-                transform.position = Vector3.MoveTowards(transform.position, player.transform.position, movementSpeed); //move away not towards
-                if (player_angle>50.0F)
+
+                //transform.position = Vector3.MoveTowards(transform.position, player.transform.position, movementSpeed); //move away not towards
+                Vector2 velocity = new Vector2((transform.position.x - player.transform.position.x) * fleeSpeed, 0);
+                rb.velocity = velocity;
+
+                if (distance>40)
                 {
                     SetTarget(null);
                     nherdState = herdState.IDLE;
-                    print("Zebra flee");
+                    print("! --------------- ZEBRA IDLE");
                 }
             break;
-                    //etc.
+
+          /*  case herdState.EATING:
+                eating--;
+                if (eating <= 0)
+                {
+                    nherdState = herdState.IDLE;
+                    print("! --------------- ZEBRA IDLE");
+                }
+                break;
+                //etc.*/
 
         }
     }
